@@ -11,6 +11,15 @@
 #include "bsp.h"
 
 #if 1
+typedef struct texture_s
+{
+	int width;
+	int height;
+	float s[3];
+	float t[3];
+	GLuint texnum;
+} texture_t;
+
 size_t vertex_count = 0;
 size_t face_count = 0;
 size_t edge_count = 0;
@@ -18,6 +27,7 @@ size_t ledge_count = 0;
 size_t model_count = 0;
 size_t plane_count = 0;
 size_t texture_count = 0;
+size_t texinfo_count = 0;
 
 dface_t *faces;
 dedge_t *edges;
@@ -25,6 +35,12 @@ int *ledges;
 dvertex_t *vertices;
 dmodel_t *models;
 dplane_t *planes;
+texture_t *textures;
+
+void vector_copy(float v0[3], float v1[3])
+{
+	memcpy(v0, v1, sizeof(float) * 3);
+}
 
 // Texture related.
 dmiptexlump_t *mip_header;
@@ -69,6 +85,7 @@ void draw_face(dface_t *face)
 
 	glEnd();
 }
+
 float angle;
 void renderScene(void) 
 {
@@ -142,26 +159,66 @@ void renderScene(void)
 	angle++;
 }
 
-typedef struct texture_s
+void upload_texture(texture_t *t, miptex_t *mip, unsigned char *texture_data, int mip_level)
 {
-	int width;
-	int height;
-	float s;
-	float t;
-	GLuint texnum;
-} texture_t;
+	size_t i, j;
+	size_t original_size = mip->width * mip->height;
+	size_t expanded_size = original_size * 3;
+	unsigned char *expanded_data = (unsigned char *)malloc(expanded_size);
 
+	for (i = 0; i < original_size; i += 3)
+	{
+		for (j = 0; j < 3; j++)
+		{
+			expanded_data[i + j] = quake_pallete[texture_data[i]][j]; 
+		}
+	}
+
+	glGenTextures(1, &t->texnum);
+	glBindTexture(GL_TEXTURE_2D, t->texnum);
+
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+	glTexImage2D(GL_TEXTURE_2D, mip_level, GL_RGB, mip->width, mip->height, 0, GL_RGB, GL_UNSIGNED_BYTE, expanded_data);
+}
 
 int read_textures()
 {
 	size_t i;
+	size_t mip_level;
+	texture_t *t;
+	miptex_t *mip;
+	texinfo_t *texinf; 
+	unsigned char *texture_data;
 
 	mip_header = get_miptexture_header();
 	texturelist = get_miptextures(mip_header, &texture_count);
+	textureinfos = get_texinfos(&texinfo_count);
 
-	for (i = 0; i < texture_count; i++)
+	//for (i = 0; i < texture_count; i++)
+	for (i = 0; i < texinfo_count; i++)
 	{
+		t = (texture_t *)malloc(sizeof(texture_t));
+		
+		texinf = &textureinfos[i];
+		vector_copy(t->s, texinf->vectorS);
+		vector_copy(t->t, texinf->vectorT);
 
+		mip = &texturelist[texinf->miptex];
+
+		for (mip_level = 0; mip_level < MIPLEVELS; mip_level++)
+		{ 
+			texture_data = get_texture(mip, mip_level);
+			//upload_texture(t, mip, texture_data, mip_level);
+			free(texture_data);
+		}
+		
+		free(t);
 	}
 
 	return 1;
@@ -213,6 +270,8 @@ int main(int argc, char **argv)
 	if (!read_bsp_data())
 		return -1;
 
+	read_textures();
+
 	x = 300;
 	y = 0;
 	z = 2000;
@@ -234,6 +293,8 @@ int main(int argc, char **argv)
 		glLightfv(GL_LIGHT0, GL_DIFFUSE, lightColor0);
 		glLightfv(GL_LIGHT0, GL_POSITION, lightPos0);
 	}*/
+
+	glEnable(GL_TEXTURE_2D);
 
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();

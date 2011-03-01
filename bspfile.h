@@ -163,7 +163,11 @@ typedef struct
 
 typedef struct texinfo_s
 {
-	float		vecs[2][4];		// [s/t][xyz offset]
+	//float		vecs[2][4];		// [s/t][xyz offset]
+	float		vectorS[3];
+	float		distS;
+	float		vectorT[3];
+	float		distT;
 	int			miptex;
 	int			flags;
 } texinfo_t;

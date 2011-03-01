@@ -82,17 +82,14 @@ miptex_t *get_miptextures(const dmiptexlump_t *mipheader, size_t *count)
 {
 	int i;
 	miptex_t *miptexes;
-	miptex_t *it;
 	
 	*count = mipheader->nummiptex;
 	miptexes = (miptex_t *)calloc(*count, sizeof(miptex_t));
-	it = miptexes;
 
 	for (i = 0; i < mipheader->nummiptex; i++)
 	{
-		fseek(f, mipheader->dataofs[i], SEEK_SET);
-		fread(it, sizeof(miptex_t), *count, f);
-		it += sizeof(miptex_t);
+		fseek(f, header.lumps[LUMP_TEXTURES].fileofs + mipheader->dataofs[i], SEEK_SET);
+		fread(&miptexes[i], sizeof(miptex_t), *count, f);
 	}
 
 	return miptexes;
@@ -100,15 +97,16 @@ miptex_t *get_miptextures(const dmiptexlump_t *mipheader, size_t *count)
 
 unsigned char *get_texture(miptex_t *miptex, int mip_level)
 {
-	unsigned char *texture_data = NULL;
+	unsigned char *texture_data;
 
 	// The miptex offsets are relative to the start of the texture lump.
 	long offset = header.lumps[LUMP_TEXTURES].fileofs + miptex->offsets[mip_level];
 	
 	// There are several mip levels stored. 1, 1/2, 1/4, 1/8 of the original size.
-	size_t size = (miptex->width * miptex->height * 3) / (int)pow(2.0, mip_level);
+	size_t size = (miptex->width * miptex->height) / (int)pow(2.0, mip_level);
 
-	texture_data = (unsigned char *)malloc(size);
+	// This is 1 byte per pixel raw data. 1 byte for index into the pallete of size 256.
+	texture_data = (unsigned char *)calloc(size, sizeof(unsigned char));
 	fseek(f, offset, SEEK_SET);
 	fread(texture_data, 1, size, f);
 
