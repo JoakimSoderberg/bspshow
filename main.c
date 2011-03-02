@@ -10,7 +10,6 @@
 
 #include "bsp.h"
 
-#if 1
 typedef struct texture_s
 {
 	int width;
@@ -20,32 +19,39 @@ typedef struct texture_s
 	GLuint texnum;
 } texture_t;
 
-size_t vertex_count = 0;
-size_t face_count = 0;
-size_t edge_count = 0;
-size_t ledge_count = 0;
-size_t model_count = 0;
-size_t plane_count = 0;
-size_t texture_count = 0;
-size_t texinfo_count = 0;
-
 dface_t *faces;
+size_t face_count = 0;
+
 dedge_t *edges;
+size_t edge_count = 0;
+
 int *ledges;
+size_t ledge_count = 0;
+
 dvertex_t *vertices;
+size_t vertex_count = 0;
+
 dmodel_t *models;
+size_t model_count = 0;
+
 dplane_t *planes;
+size_t plane_count = 0;
+
 texture_t *textures;
+size_t texture_count = 0;
+
+// Texture related.
+dmiptexlump_t *mip_header;
+miptex_t **mipmap_ptrs;
+size_t mipmap_count = 0;
+
+texinfo_t *textureinfos;
+size_t texinfo_count = 0;
 
 void vector_copy(float v0[3], float v1[3])
 {
 	memcpy(v0, v1, sizeof(float) * 3);
 }
-
-// Texture related.
-dmiptexlump_t *mip_header;
-miptex_t *texturelist;
-texinfo_t *textureinfos;
 
 float cx, cy, cz;
 float x, y, z;
@@ -107,43 +113,8 @@ void renderScene(void)
 	glLoadIdentity();
 	gluLookAt(x, y, z, cx, cy, cz, 0, 0.0, 1.0);
 
-	/*
-	glRotatef(angle, 1.0, 0.0, 0.0);
-    glRotatef(angle, 0.0, 1.0, 0.0);
-    glRotatef(angle, 0.0, 0.0, 1.0);
-	*/
-	
-	
 	glColor3f(0.0, 1.0, 0.0);
-
-	/*
-	glBegin(GL_POINTS);
-	{
-		for (i = 0; i < vertex_count; i++)
-		{
-			glVertex3fv(vertices[i].point);
-		}
-	}
-	glEnd();
-	*/
-	/*
-	glBegin(GL_LINES);
-	{
-		dvertex_t *v0;
-		dvertex_t *v1;
-
-		for (i = 0; i < edge_count; i++)
-		{
-			v0 = &vertices[edges[i].v[0]];
-			v1 = &vertices[edges[i].v[1]];
-
-			glVertex3fv(v0->point);
-			glVertex3fv(v1->point);
-		}
-	}
-	glEnd();
-	*/
-
+	
 	for (j = 0; j < model_count; j++)
 	{
 		for (i = models[j].firstface; i < (size_t)models[j].numfaces; i++)
@@ -159,22 +130,30 @@ void renderScene(void)
 	angle++;
 }
 
-void upload_texture(texture_t *t, miptex_t *mip, unsigned char *texture_data, int mip_level)
+
+void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data, int mip_level)
 {
 	size_t i, j;
-	size_t original_size = mip->width * mip->height;
-	size_t expanded_size = original_size * 3;
-	unsigned char *expanded_data = (unsigned char *)malloc(expanded_size);
+	size_t tex_index;
+	int color_index;
+	size_t width = mip->width / (int)pow(2.0, mip_level);
+	size_t height = mip->height / (int)pow(2.0, mip_level);
+	size_t original_size = width * height;
+	size_t expanded_size = (original_size * 3);
+	byte *expanded_data = (byte *)malloc(expanded_size);
+	t->width = width;
+	t->height = height;
 
-	for (i = 0; i < original_size; i += 3)
+	for (i = 0, tex_index = 0; i < expanded_size; i += 3, tex_index++)
 	{
+		color_index = texture_data[tex_index];
+
 		for (j = 0; j < 3; j++)
 		{
-			expanded_data[i + j] = quake_pallete[texture_data[i]][j]; 
+			expanded_data[i + j] = quake_pallete[color_index][j];
 		}
 	}
 
-	glGenTextures(1, &t->texnum);
 	glBindTexture(GL_TEXTURE_2D, t->texnum);
 
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
@@ -184,45 +163,76 @@ void upload_texture(texture_t *t, miptex_t *mip, unsigned char *texture_data, in
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
-	glTexImage2D(GL_TEXTURE_2D, mip_level, GL_RGB, mip->width, mip->height, 0, GL_RGB, GL_UNSIGNED_BYTE, expanded_data);
+	glTexImage2D(GL_TEXTURE_2D, mip_level, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, expanded_data);
+	
+	free(expanded_data);
+}
+
+int texture_loaded(size_t texnum)
+{
+	size_t i;
+
+	for (i = 0; i < texture_count; i++)
+	{
+		if (textures[i].texnum == texnum)
+			return 1;
+	}
+
+	return 0;
 }
 
 int read_textures()
 {
 	size_t i;
 	size_t mip_level;
+	size_t texnum = 0;
 	texture_t *t;
 	miptex_t *mip;
 	texinfo_t *texinf; 
 	unsigned char *texture_data;
 
-	mip_header = get_miptexture_header();
-	texturelist = get_miptextures(mip_header, &texture_count);
+	// Read the texture data.
+	byte *texdata = get_miptexture_lump_data();
+	mipmap_ptrs = get_miptextures(texdata, &mipmap_count);
 	textureinfos = get_texinfos(&texinfo_count);
 
-	//for (i = 0; i < texture_count; i++)
-	for (i = 0; i < texinfo_count; i++)
+	// Allocate space for the texture list.
+	textures = (texture_t *)calloc(texinfo_count, sizeof(texture_t));
+	memset(textures, -1, sizeof(texture_t) * texinfo_count);
+
+	// Several faces can share a texinfo.
+	// Go through each face, and get its texinfo. Only create a new texture_t
+	// if the texture hasn't already been loaded.
+	for (i = 0; i < face_count; i++)
 	{
-		t = (texture_t *)malloc(sizeof(texture_t));
-		
-		texinf = &textureinfos[i];
-		vector_copy(t->s, texinf->vectorS);
-		vector_copy(t->t, texinf->vectorT);
+		texnum = faces[i].texinfo;
 
-		mip = &texturelist[texinf->miptex];
+		if (!texture_loaded(texnum))
+		{
+			texinf = &textureinfos[texnum];
 
-		for (mip_level = 0; mip_level < MIPLEVELS; mip_level++)
-		{ 
-			texture_data = get_texture(mip, mip_level);
-			//upload_texture(t, mip, texture_data, mip_level);
-			free(texture_data);
+			t = &textures[texture_count++];
+			t->texnum = texnum;
+			
+			vector_copy(t->s, texinf->vectorS);
+			vector_copy(t->t, texinf->vectorT);
+
+			// Get the pointer to the mipmap.
+			mip = mipmap_ptrs[texinf->miptex];
+
+			// Upload the texture data to OpenGL.
+			for (mip_level = 0; mip_level < MIPLEVELS - 1; mip_level++)
+			{
+				texture_data = get_texture(texdata, mip, mip_level);
+				upload_texture(t, mip, texture_data, mip_level);
+				free(texture_data);
+			}
 		}
-		
-		free(t);
 	}
 
 	return 1;
 }
+
 
 int read_bsp_data()
 {
@@ -263,6 +273,7 @@ int main(int argc, char **argv)
 	glutCreateWindow("SnowMen");
 	glutDisplayFunc(renderScene);
 	glutIdleFunc(renderScene);
+	
 
 	srand(time(NULL));
 
@@ -277,23 +288,7 @@ int main(int argc, char **argv)
 	z = 2000;
 	direction = 1.745f;
 	updown = 0.61f;
-	/*
-	glEnable(GL_DEPTH_TEST);
-	glClearDepth(1.0);
 	
-	{
-		GLfloat ambientColor[] = {0.2f, 0.2f, 0.2f, 1.0f}; //Color(0.2, 0.2, 0.2)
-		 GLfloat lightColor0[] = {0.5f, 0.5f, 0.5f, 1.0f}; //Color (0.5, 0.5, 0.5)
-		GLfloat lightPos0[] = {4.0f, 0.0f, 8.0f, 1.0f}; //Positioned at (4, 0, 8)
-		glEnable(GL_LIGHTING);
-		glEnable(GL_LIGHT0);
-		glShadeModel(GL_SMOOTH);
-		glLightModelfv(GL_LIGHT_MODEL_AMBIENT, ambientColor);
-
-		glLightfv(GL_LIGHT0, GL_DIFFUSE, lightColor0);
-		glLightfv(GL_LIGHT0, GL_POSITION, lightPos0);
-	}*/
-
 	glEnable(GL_TEXTURE_2D);
 
 	glMatrixMode(GL_PROJECTION);
@@ -307,7 +302,7 @@ int main(int argc, char **argv)
 
 	
 	glutMainLoop();
-
+	
 	free(vertices);
 	free(edges);
 	free(ledges);
@@ -315,48 +310,4 @@ int main(int argc, char **argv)
 
 	return 0;
 }
-#else
 
-GLfloat angle = 0.0;
-void cube (void) {
-    glRotatef(angle, 1.0, 0.0, 0.0);
-    glRotatef(angle, 0.0, 1.0, 0.0);
-    glRotatef(angle, 0.0, 0.0, 1.0);
-    glColor3f(1.0, 0.0, 0.0);
-    glutSolidCube(2);
-}
-void init (void) {
-    glEnable (GL_DEPTH_TEST);
-    glEnable (GL_LIGHTING);
-    glEnable (GL_LIGHT0);
-}
-void display (void) {
-    glClearColor (0.0,0.0,0.0,1.0);
-    glClear (GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    glLoadIdentity();  
-    gluLookAt (0.0, 0.0, 5.0, 0.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-    cube();
-    glutSwapBuffers();
-    angle ++;
-}
-void reshape (int w, int h) {
-    glViewport (0, 0, (GLsizei)w, (GLsizei)h);
-    glMatrixMode (GL_PROJECTION);
-    glLoadIdentity ();
-    gluPerspective (60, (GLfloat)w / (GLfloat)h, 1.0, 100.0);
-    glMatrixMode (GL_MODELVIEW);
-}
-int main (int argc, char **argv) {
-    glutInit (&argc, argv);
-    glutInitDisplayMode (GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH);
-    glutInitWindowSize (500, 500);
-    glutInitWindowPosition (100, 100);
-    glutCreateWindow ("A basic OpenGL Window");
-    init ();
-    glutDisplayFunc (display);
-    glutIdleFunc (display);
-    glutReshapeFunc (reshape);
-    glutMainLoop ();
-    return 0;
-}
-#endif

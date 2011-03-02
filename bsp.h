@@ -4,6 +4,8 @@
 
 #include "bspfile.h"
 
+typedef unsigned char byte;
+
 int open_bsp(const char *filename);
 dvertex_t *get_vertices(size_t *count);
 dface_t *get_faces(size_t *count);
@@ -12,9 +14,15 @@ int *get_ledges(size_t *count);
 dmodel_t *get_models(size_t *count);
 dplane_t *get_planes(size_t *count);
 texinfo_t *get_texinfos(size_t *count);
+byte *get_miptexture_lump_data();
+miptex_t **get_miptextures(const byte *texture_lump_data, size_t *count);
+byte *get_texture(const byte *texture_lump_data, const miptex_t *miptex, int mip_level);
+
+/*
 dmiptexlump_t *get_miptexture_header();
 miptex_t *get_miptextures(const dmiptexlump_t *mipheader, size_t *count);
 unsigned char *get_texture(miptex_t *miptex, int mip_level);
+*/
 
 int quake_pallete[][3] = 
 {
