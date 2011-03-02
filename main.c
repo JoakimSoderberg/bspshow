@@ -1,8 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <windows.h>
-//#include <gl/gl.h>
-//#include <gl/glu.h>
 #include <gl/freeglut.h>
 
 #include <math.h>
@@ -15,8 +13,11 @@ typedef struct texture_s
 	int width;
 	int height;
 	float s[3];
+	float distS;
 	float t[3];
+	float distT;
 	GLuint texnum;
+	int is_loaded;
 } texture_t;
 
 dface_t *faces;
@@ -48,6 +49,8 @@ size_t mipmap_count = 0;
 texinfo_t *textureinfos;
 size_t texinfo_count = 0;
 
+#define DotProduct(x,y)			((x)[0] * (y)[0] + (x)[1] * (y)[1] + (x)[2] * (y)[2])
+
 void vector_copy(float v0[3], float v1[3])
 {
 	memcpy(v0, v1, sizeof(float) * 3);
@@ -64,36 +67,41 @@ void draw_face(dface_t *face)
 	dvertex_t *v;
 	int e;
 	int lindex;
+	float s, t;
+	texture_t *texture = &textures[face->texinfo];
 	
 	// Set the normal of the face.
 	glNormal3fv(planes[face->planenum].normal);
 
 	// Draw the face.
 	glBegin(GL_POLYGON);
-
-	for (e = 0; e < face->numedges; e ++)
 	{
-		lindex = ledges[face->firstedge + e];
+		glEnable(GL_TEXTURE_2D);
+		glBindTexture(GL_TEXTURE_2D, texture->texnum);
 
-		if (lindex > 0)
-		{					
-			edge = &edges[lindex];
-			v = &vertices[edge->v[0]];
-			glVertex3fv(v->point);
-		}
-		else
+		for (e = 0; e < face->numedges; e ++)
 		{
-			edge = &edges[-lindex];
-			v = &vertices[edge->v[1]];
+			lindex = ledges[face->firstedge + e];
+
+			if (lindex > 0)
+			{					
+				edge = &edges[lindex];
+				v = &vertices[edge->v[0]];
+			}
+			else
+			{
+				edge = &edges[-lindex];
+				v = &vertices[edge->v[1]];
+			}
+
 			glVertex3fv(v->point);
 		}
 	}
-
 	glEnd();
 }
 
 float angle;
-void renderScene(void) 
+void renderScene(void)
 {
 	size_t i;
 	size_t j;
@@ -113,7 +121,7 @@ void renderScene(void)
 	glLoadIdentity();
 	gluLookAt(x, y, z, cx, cy, cz, 0, 0.0, 1.0);
 
-	glColor3f(0.0, 1.0, 0.0);
+	//glColor3f(0.0, 1.0, 0.0);
 	
 	for (j = 0; j < model_count; j++)
 	{
@@ -130,10 +138,9 @@ void renderScene(void)
 	angle++;
 }
 
-
 void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data, int mip_level)
 {
-	size_t i, j;
+	size_t i;
 	size_t tex_index;
 	int color_index;
 	size_t width = mip->width / (int)pow(2.0, mip_level);
@@ -144,14 +151,11 @@ void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data,
 	t->width = width;
 	t->height = height;
 
+	// Convert the image from indexed palette values to RGB values for each pixel.
 	for (i = 0, tex_index = 0; i < expanded_size; i += 3, tex_index++)
 	{
 		color_index = texture_data[tex_index];
-
-		for (j = 0; j < 3; j++)
-		{
-			expanded_data[i + j] = quake_pallete[color_index][j];
-		}
+		memcpy(&expanded_data[i], &quake_pallete[color_index], 3);
 	}
 
 	glBindTexture(GL_TEXTURE_2D, t->texnum);
@@ -168,19 +172,6 @@ void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data,
 	free(expanded_data);
 }
 
-int texture_loaded(size_t texnum)
-{
-	size_t i;
-
-	for (i = 0; i < texture_count; i++)
-	{
-		if (textures[i].texnum == texnum)
-			return 1;
-	}
-
-	return 0;
-}
-
 int read_textures()
 {
 	size_t i;
@@ -193,12 +184,11 @@ int read_textures()
 
 	// Read the texture data.
 	byte *texdata = get_miptexture_lump_data();
-	mipmap_ptrs = get_miptextures(texdata, &mipmap_count);
+	mipmap_ptrs	= get_miptextures(texdata, &mipmap_count);
 	textureinfos = get_texinfos(&texinfo_count);
 
 	// Allocate space for the texture list.
 	textures = (texture_t *)calloc(texinfo_count, sizeof(texture_t));
-	memset(textures, -1, sizeof(texture_t) * texinfo_count);
 
 	// Several faces can share a texinfo.
 	// Go through each face, and get its texinfo. Only create a new texture_t
@@ -207,15 +197,17 @@ int read_textures()
 	{
 		texnum = faces[i].texinfo;
 
-		if (!texture_loaded(texnum))
+		if (!textures[texnum].is_loaded)
 		{
 			texinf = &textureinfos[texnum];
 
 			t = &textures[texture_count++];
 			t->texnum = texnum;
-			
+
 			vector_copy(t->s, texinf->vectorS);
 			vector_copy(t->t, texinf->vectorT);
+			t->distS = texinf->distS;
+			t->distT = texinf->distT;
 
 			// Get the pointer to the mipmap.
 			mip = mipmap_ptrs[texinf->miptex];
@@ -227,18 +219,19 @@ int read_textures()
 				upload_texture(t, mip, texture_data, mip_level);
 				free(texture_data);
 			}
+
+			textures[texnum].is_loaded = 1;
 		}
 	}
 
 	return 1;
 }
 
-
-int read_bsp_data()
+int read_bsp_data(const char *filename)
 {
-	if (!open_bsp("aerowalk.bsp"))
+	if (!open_bsp(filename))
 	{
-		printf("Failed to open bsp.\n");
+		printf("Failed to open bsp: %s.\n", filename);
 		return 0;
 	}
 
@@ -249,13 +242,14 @@ int read_bsp_data()
 	models = get_models(&model_count);
 	planes = get_planes(&plane_count);
 
+	read_textures();
+
 	return 1;
 }
 
 void init_lighting()
 {
 	GLfloat light_diffuse[4] = {1.0, 1.0, 1.0, 1.0};
-	//GLfloat light_position[4] = {1000.0, 1000.0, 2000.0, 0.0};
 	GLfloat light_position[] = {1.0, 1.0, 1.0, 0.0};
 
 	glEnable (GL_DEPTH_TEST);
@@ -265,8 +259,15 @@ void init_lighting()
 
 int main(int argc, char **argv)
 {
-	
-	
+	if (argc < 2)
+	{
+		printf("Not enough arguments\n");
+		return -1;
+	}
+
+	if (!read_bsp_data(argv[1]))
+		return -1;
+
 	glutInit(&argc, argv);
 	glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
 	glutInitWindowSize(800,600);
@@ -274,14 +275,7 @@ int main(int argc, char **argv)
 	glutDisplayFunc(renderScene);
 	glutIdleFunc(renderScene);
 	
-
 	srand(time(NULL));
-
-
-	if (!read_bsp_data())
-		return -1;
-
-	read_textures();
 
 	x = 300;
 	y = 0;
@@ -299,10 +293,10 @@ int main(int argc, char **argv)
 	glCullFace(GL_FRONT);
 
 	init_lighting();
-
 	
 	glutMainLoop();
 	
+	// Cleanup.
 	free(vertices);
 	free(edges);
 	free(ledges);
