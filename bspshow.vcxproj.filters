@@ -21,12 +21,24 @@
     <ClCompile Include="bsp.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="utils.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="bsphelper.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="bspfile.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="bsp.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="bsphelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

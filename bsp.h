@@ -18,12 +18,6 @@ byte *get_miptexture_lump_data();
 miptex_t **get_miptextures(const byte *texture_lump_data, size_t *count);
 byte *get_texture(const byte *texture_lump_data, const miptex_t *miptex, int mip_level);
 
-/*
-dmiptexlump_t *get_miptexture_header();
-miptex_t *get_miptextures(const dmiptexlump_t *mipheader, size_t *count);
-unsigned char *get_texture(miptex_t *miptex, int mip_level);
-*/
-
 int quake_pallete[][3] = 
 {
 {0, 0, 0},
