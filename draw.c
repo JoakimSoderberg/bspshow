@@ -14,7 +14,7 @@ void draw_text(float x, float y, float z, const char *format, ...)
 	const char *c;
 	va_list args;
 
-	buf[0] = NULL;
+	buf[0] = 0;
 	
 	glRasterPos3f(x, y,z);
 

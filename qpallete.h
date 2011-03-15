@@ -1,4 +1,7 @@
 
+#ifndef __QPALLETE_H__
+#define __QPALLETE_H__
+
 unsigned char quake_pallete[][3] = 
 {
 {0, 0, 0},
@@ -259,3 +262,4 @@ unsigned char quake_pallete[][3] =
 {159, 91, 83}
 };
 
+#endif // __QPALLETE_H__

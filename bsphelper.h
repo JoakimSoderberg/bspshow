@@ -1,8 +1,9 @@
 
 #ifndef __BSPHELPER_H__
 #define __BSPHELPER_H__
+
 #include <stdarg.h>
-#include "bspfile.h"
+#include "bsp.h"
 
 typedef struct texture_s
 {
@@ -27,5 +28,9 @@ typedef struct polygon_s
 	dedge_t		*edges;
 	dplane_t	*plane;
 } polygon_t;
+
+float calculate_face_area(dface_t *face);
+int read_textures();
+void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data, int mip_level);
 
 #endif // __BSPHELPER_H__
