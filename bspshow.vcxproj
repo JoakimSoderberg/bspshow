@@ -84,6 +84,8 @@
   <ItemGroup>
     <ClCompile Include="bsp.c" />
     <ClCompile Include="bsphelper.c" />
+    <ClCompile Include="draw.c" />
+    <ClCompile Include="input.c" />
     <ClCompile Include="main.c" />
     <ClCompile Include="utils.c" />
   </ItemGroup>
@@ -91,6 +93,10 @@
     <ClInclude Include="bsp.h" />
     <ClInclude Include="bspfile.h" />
     <ClInclude Include="bsphelper.h" />
+    <ClInclude Include="config.h" />
+    <ClInclude Include="draw.h" />
+    <ClInclude Include="input.h" />
+    <ClInclude Include="qpallete.h" />
     <ClInclude Include="utils.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -7,34 +7,18 @@
 #include <time.h>
 
 #include "bsp.h"
-#include "bsphelper.h"
 #include "utils.h"
+#include "input.h"
+#include "qpallete.h"
+#include "draw.h"
+#include "bsphelper.h"
+#include "config.h"
 
 #define PI 3.14159
 
 typedef float vec_t;
 typedef vec_t vec3_t[3];
 typedef vec_t vec5_t[5];
-
-typedef struct config_s
-{
-	float cx, cy, cz;
-	float x, y, z;
-	float direction;
-	float updown;
-	int window_width;
-	int window_height;
-	int left_mouse;
-	int right_mouse;
-	int down_mouse_x;
-	int down_mouse_y;
-	float clip_height;
-	float min_edge_length;
-	float min_area;
-
-	int perspective;
-	float zoom;
-} config_t;
 
 config_t config;
 
@@ -48,7 +32,6 @@ int init_config()
 
 	return 1;
 }
-
 
 dface_t *faces;
 size_t face_count = 0;
@@ -78,144 +61,6 @@ size_t mipmap_count = 0;
 
 texinfo_t *textureinfos;
 size_t texinfo_count = 0;
-
-void draw_bounding_box(dmodel_t *m)
-{ 
-	int render_type = GL_LINE; // GL_FILL;
-	
-	glDisable(GL_CULL_FACE);
-
-	glPushAttrib(GL_POLYGON_BIT);
-	glPolygonMode(GL_FRONT, render_type);
-	glPolygonMode(GL_BACK, render_type);
-	
-	glBegin(GL_POLYGON);
-	{
-		// Top.
-		glColor4f(0.0, 1.0, 1.0, 0.25);
-		glVertex3f(m->mins[0], m->mins[1], m->maxs[2]);
-
-		glColor4f(1.0, 0.0, 0.0, 0.5);
-		glVertex3f(m->mins[0], m->maxs[1], m->maxs[2]);
-
-		glColor4f(0.0, 1.0, 0.0, 0.5);
-		glVertex3f(m->maxs[0], m->maxs[1], m->maxs[2]);
-
-		glColor4f(0.0, 0.0, 1.0, 0.5);
-		glVertex3f(m->maxs[0], m->mins[1], m->maxs[2]);
-	}
-	glEnd();
-
-	glBegin(GL_POLYGON);
-	{
-		// Bottom.
-		glColor4f(0.0, 1.0, 1.0, 0.25);
-		glVertex3f(m->mins[0], m->mins[1], m->mins[2]);
-
-		glColor4f(1.0, 0.0, 0.0, 0.5);
-		glVertex3f(m->mins[0], m->maxs[1], m->mins[2]);
-
-		glColor4f(0.0, 1.0, 0.0, 0.5);
-		glVertex3f(m->maxs[0], m->maxs[1], m->mins[2]);
-
-		glColor4f(0.0, 0.0, 1.0, 0.5);
-		glVertex3f(m->maxs[0], m->mins[1], m->mins[2]);
-	}
-	glEnd();
-
-	glBegin(GL_POLYGON);
-	{
-		// Side 1.
-		glColor4f(0.0, 1.0, 1.0, 0.25);
-		glVertex3f(m->mins[0], m->mins[1], m->mins[2]);
-
-		glColor4f(1.0, 0.0, 0.0, 0.5);
-		glVertex3f(m->mins[0], m->mins[1], m->maxs[2]);
-
-		glColor4f(0.0, 1.0, 0.0, 0.5);
-		glVertex3f(m->mins[0], m->maxs[1], m->maxs[2]);
-
-		glColor4f(0.0, 0.0, 1.0, 0.5);
-		glVertex3f(m->mins[0], m->maxs[1], m->mins[2]);
-	}
-	glEnd();	
-
-	glBegin(GL_POLYGON);
-	{
-		// Side 2.
-		glColor4f(0.0, 1.0, 1.0, 0.25);
-		glVertex3f(m->mins[0], m->mins[1], m->mins[2]);
-
-		glColor4f(1.0, 0.0, 0.0, 0.5);
-		glVertex3f(m->mins[0], m->mins[1], m->maxs[2]);
-
-		glColor4f(0.0, 1.0, 0.0, 0.5);
-		glVertex3f(m->maxs[0], m->mins[1], m->maxs[2]);
-
-		glColor4f(0.0, 0.0, 1.0, 0.5);
-		glVertex3f(m->maxs[0], m->mins[1], m->mins[2]);
-	}
-	glEnd();
-
-	glBegin(GL_POLYGON);
-	{
-		// Side 3.
-		glColor4f(0.0, 1.0, 1.0, 0.25);
-		glVertex3f(m->maxs[0], m->mins[1], m->mins[2]);
-
-		glColor4f(1.0, 0.0, 0.0, 0.5);
-		glVertex3f(m->maxs[0], m->mins[1], m->maxs[2]);
-
-		glColor4f(0.0, 1.0, 0.0, 0.5);
-		glVertex3f(m->maxs[0], m->maxs[1], m->maxs[2]);
-
-		glColor4f(0.0, 0.0, 1.0, 0.5);
-		glVertex3f(m->maxs[0], m->maxs[1], m->mins[2]);
-	}
-	glEnd();
-
-	glBegin(GL_POLYGON);
-	{
-		// Side 4.
-		glColor4f(0.0, 1.0, 1.0, 0.25);
-		glVertex3f(m->mins[0], m->maxs[1], m->mins[2]);
-
-		glColor4f(1.0, 0.0, 0.0, 0.5);
-		glVertex3f(m->mins[0], m->maxs[1], m->maxs[2]);
-
-		glColor4f(0.0, 1.0, 0.0, 0.5);
-		glVertex3f(m->maxs[0], m->maxs[1], m->maxs[2]);
-
-		glColor4f(0.0, 0.0, 1.0, 0.5);
-		glVertex3f(m->maxs[0], m->maxs[1], m->mins[2]);
-	}
-	glEnd();
-
-	glEnable(GL_CULL_FACE);
-
-	glPopAttrib();
-}
-
-void draw_text(float x, float y, float z, const char *format, ...)
-{
-	static char buf[512];
-	const char *c;
-	va_list args;
-
-	buf[0] = NULL;
-	
-	glRasterPos3f(x, y,z);
-
-	va_start(args, format);
-	vsnprintf(buf, sizeof(buf), format, args);
-
-	for (c = buf; *c != '\0'; c++) 
-	{
-		glutBitmapCharacter(GLUT_BITMAP_HELVETICA_12, *c);
-	}
-	
-	va_end(args);
-}
 
 float calculate_face_area(dface_t *face)
 {
@@ -263,180 +108,6 @@ float calculate_face_area(dface_t *face)
 	return total_area;*/
 }
 
-void draw_face(dface_t *face)
-{
-	dedge_t *edge;
-	dvertex_t *v;
-	float vertex_color; 
-	int e;
-	int lindex;
-	float s, t;
-	float max_z = models[0].maxs[2];
-	float min_z = models[0].mins[2];
-	texture_t *texture = &textures[face->texinfo];
-	float *normal = planes[face->planenum].normal;
-	
-	// Don't draw walls in orthogonal projection.
-	if (!config.perspective && (normal[2] > -0.5) && (normal[2] < 0.5))
-		return;
-
-	// Enable a clipping plane, so that a percentage of the absolute top of the level isn't drawn.
-	{
-		double plane[4] = {0.0, 0.0, -1.0, 0.0};
-		glPushMatrix();
-   		glEnable(GL_CLIP_PLANE0);
-		glTranslatef(0.0, 0.0, max_z * config.clip_height);
-   		glClipPlane(GL_CLIP_PLANE0, plane);
-		glPopMatrix();
-	}
-
-	// Set the normal of the face.
-	glNormal3fv(normal);
-	
-	// Draw the face.
-	glBegin(GL_POLYGON);
-	{
-		if (strstr(texture->name, "sky"))
-			goto end;
-
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, texture->texnum);
-
-		for (e = 0; e < face->numedges; e++)
-		{
-			lindex = ledges[face->firstedge + e];
-
-			if (lindex > 0)
-			{					
-				edge = &edges[lindex];
-				v = &vertices[edge->v[0]];
-			}
-			else
-			{
-				edge = &edges[-lindex];
-				v = &vertices[edge->v[1]];
-			}
-
-			vertex_color = fabs(v->point[2] / (max_z - min_z));
-			glColor4f(vertex_color, vertex_color, vertex_color, 0.5);
-
-			glTexCoord2d(0.0, 0.0);
-			glTexCoord2d(0.0, 1.0);
-			glTexCoord2d(1.0, 0.0);
-			glTexCoord2d(1.0, 1.0);
-			glVertex3fv(v->point);
-		}
-	}
-end:
-	glEnd();
-
-	if (calculate_face_area(face) == 0.0)
-		return;
-	
-	glBegin(GL_LINES);
-	{
-		dvertex_t *v0;
-		dvertex_t *v1;
-
-		glColor3f(1.0, 1.0, 1.0);
-		for (e = 0; e < face->numedges; e++)
-		{
-			lindex = ledges[face->firstedge + e];
-			
-			edge = (lindex > 0) ? &edges[lindex] : &edges[-lindex];
-			v0 = &vertices[edge->v[0]];
-			v1 = &vertices[edge->v[1]];
-
-			vertex_color = fabs(v->point[2] / ((max_z - min_z) * 0.1f));
-			glColor4f(vertex_color, vertex_color, vertex_color, 0.5);
-
-			{
-				float d[3];
-				float edge_length;
-				VectorSubtract(v0->point, v1->point, d);
-
-				edge_length = sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
-
-				if (edge_length < config.min_edge_length)
-					continue;
-			}
-
-			glVertex3fv(v0->point);
-			glVertex3fv(v1->point);
-		}
-	}
-	glEnd();
-	
-
-	glDisable(GL_CLIP_PLANE0);
-}
-
-void draw_axis()
-{
-	float size = 525.0;
-	//glDepthFunc(GL_ALWAYS);     // to avoid visual artifacts with grid lines
-    //glDisable(GL_LIGHTING);
-
-    // draw axis
-    glLineWidth(3);
-    glBegin(GL_LINES);
-        glColor3f(1, 0, 0);
-        glVertex3f(0, 0, 0);
-        glVertex3f(size, 0, 0);
-        glColor3f(0, 1, 0);
-        glVertex3f(0, 0, 0);
-        glVertex3f(0, size, 0);
-        glColor3f(0, 0, 1);
-        glVertex3f(0, 0, 0);
-        glVertex3f(0, 0, size);
-    glEnd();
-    glLineWidth(1);
-
-    // draw arrows(actually big square dots)
-    glPointSize(5);
-    glBegin(GL_POINTS);
-        glColor3f(1, 0, 0);
-        glVertex3f(size, 0, 0);
-        glColor3f(0, 1, 0);
-        glVertex3f(0, size, 0);
-        glColor3f(0, 0, 1);
-        glVertex3f(0, 0, size);
-    glEnd();
-    glPointSize(1);
-
-    // restore default settings
-    //glEnable(GL_LIGHTING);
-    //glDepthFunc(GL_LEQUAL);
-}
-
-void place_camera()
-{
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	
-	if (config.perspective)
-	{
-		float x = config.x;
-		float y = config.y;
-		float z = config.z;
-		float cx = config.cx;
-		float cy = config.cy;
-		float cz = config.cz;
-		gluPerspective(70.0, 1.0, 1.0, 5000.0);
-		gluLookAt(x, y, z, cx, cy, cz, 0, 0.0, 1.0);
-	}
-	else
-	{
-		float x = config.x;
-		float y = config.y;
-		float zoom = config.zoom;
-		glOrtho(0.0, zoom * 800, zoom * 600, 0, -99999, 99999);
-		glTranslatef(x, y, -100.0);
-		glRotatef(180.0, 0.0, 1.0, 0.0);
-	}
-}
-
-float angle;
 void renderScene(void)
 {	
 	size_t i;
@@ -469,8 +140,6 @@ void renderScene(void)
 
 	glPopMatrix();
 	glutSwapBuffers();
-
-	angle++;
 }
 
 void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data, int mip_level)
@@ -609,53 +278,6 @@ void init_lighting()
 	glEnable (GL_DEPTH_TEST);
     glEnable (GL_LIGHTING);
     glEnable (GL_LIGHT0);
-}
-
-void on_mouse(int button, int state, int mouse_x, int mouse_y)
-{
-	config.right_mouse = ((state == GLUT_DOWN) && (button == GLUT_RIGHT_BUTTON));
-	config.left_mouse = ((state == GLUT_DOWN) && (button == GLUT_LEFT_BUTTON));
-	config.down_mouse_x = mouse_x;
-	config.down_mouse_y = mouse_y;
-}
-
-void on_mouse_move(int mouse_x, int mouse_y)
-{
-	if (config.right_mouse)
-	{
-		config.x = (float)(config.x - config.down_mouse_x);
-		config.y = (config.window_height) - (float)(config.y - config.down_mouse_y);
-	}
-
-	config.down_mouse_x = mouse_x;
-	config.down_mouse_y = mouse_y;
-}
-
-void on_keyboard(unsigned char key, int key_x, int key_y)
-{
-	switch (key)
-	{
-		case 'p':	config.perspective = !config.perspective; break;
-		case '+':	config.clip_height += 0.01f; break;
-		case '-':	config.clip_height -= 0.01f; break;
-		case 'w':	config.min_edge_length += 0.1f; break;
-		case 's':	config.min_edge_length -= 0.1f; break;
-		case 'e':	config.min_area += 1.0f; break;
-		case 'd':	config.min_area -= 1.0f; break;
-	}
-}
-
-void on_special_key(int key, int key_x, int key_y)
-{
-	switch (key)
-	{
-		case GLUT_KEY_LEFT:		config.x += 10.0f; break;
-		case GLUT_KEY_RIGHT:	config.x -= 10.0f; break;
-		case GLUT_KEY_UP:		config.y += 10.0f; break;
-		case GLUT_KEY_DOWN:		config.y -= 10.0f; break;
-		case GLUT_KEY_PAGE_UP:	config.zoom += 0.1f; break;
-		case GLUT_KEY_PAGE_DOWN: config.zoom -= 0.1f; break;
-	}
 }
 
 int main(int argc, char **argv)
