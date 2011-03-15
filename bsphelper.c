@@ -86,24 +86,40 @@ void get_polygons()
 	*/
 }
 
+unsigned char *expand_texture(const miptex_t *mip, const byte *texture, int mip_level)
+{
+	size_t i;
+	size_t width = mip->width / (int)pow(2.0, mip_level);
+	size_t height = mip->height / (int)pow(2.0, mip_level);
+	size_t expanded_size = (width * height * 3);
+	byte *expanded_data = (byte *)malloc(expanded_size);
+
+	// Convert the image from indexed palette values to RGB values for each pixel.
+	for (i = 0; i < expanded_size; i++)
+	{
+		memcpy(&expanded_data[i*3], &quake_pallete[texture[i]], 3);
+	}
+}
+
 void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data, int mip_level)
 {
 	size_t i;
 	size_t tex_index;
-	int color_index;
+	size_t color_index;
 	size_t width = mip->width / (int)pow(2.0, mip_level);
 	size_t height = mip->height / (int)pow(2.0, mip_level);
 	size_t original_size = width * height;
 	size_t expanded_size = (original_size * 3);
+	
 	byte *expanded_data = (byte *)malloc(expanded_size);
 	t->width = width;
 	t->height = height;
 
 	// Convert the image from indexed palette values to RGB values for each pixel.
-	for (i = 0, tex_index = 0; i < expanded_size; i += 3, tex_index++)
+	for (i = 0; i < original_size; i++)
 	{
-		color_index = texture_data[tex_index];
-		memcpy(&expanded_data[i], &quake_pallete[color_index], 3);
+		color_index = texture_data[i];
+		memcpy(&expanded_data[i*3], &quake_pallete[color_index], 3);
 	}
 
 	glBindTexture(GL_TEXTURE_2D, t->texnum);
