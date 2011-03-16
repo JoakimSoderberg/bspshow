@@ -82,13 +82,11 @@ byte *get_miptexture_lump_data()
 miptex_t **get_miptextures(const byte *texture_lump_data, size_t *count)
 {
 	size_t i;
-	const byte *d = texture_lump_data;
 	miptex_t **mips;
 	dmiptexlump_t *miptex_header;
 	
 	// Get the header.
-	miptex_header = (dmiptexlump_t *)d;
-	d += (sizeof(dmiptexlump_t) * sizeof(long) * miptex_header->nummiptex);
+	miptex_header = (dmiptexlump_t *)texture_lump_data;
 
 	// Allocate memory for pointers to the textures.
 	*count = miptex_header->nummiptex;

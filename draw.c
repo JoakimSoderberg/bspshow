@@ -233,16 +233,8 @@ end:
 			vertex_color = fabs(v->point[2] / ((max_z - min_z) * 0.1f));
 			glColor4f(vertex_color, vertex_color, vertex_color, 0.5);
 
-			{
-				float d[3];
-				float edge_length;
-				VectorSubtract(v0->point, v1->point, d);
-
-				edge_length = sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
-
-				if (edge_length < config.min_edge_length)
-					continue;
-			}
+			if (!is_edge_long_enough(v0, v1))
+				continue;
 
 			glVertex3fv(v0->point);
 			glVertex3fv(v1->point);
@@ -252,6 +244,79 @@ end:
 	
 
 	glDisable(GL_CLIP_PLANE0);
+}
+
+void enable_vertical_clipping_plane()
+{
+	float max_z = models[0].maxs[2];
+	float min_z = models[0].mins[2];
+	double plane[4] = {0.0, 0.0, -1.0, 0.0};
+	glPushMatrix();
+	glEnable(GL_CLIP_PLANE0);
+	glTranslatef(0.0, 0.0, max_z * config.clip_height);
+	glClipPlane(GL_CLIP_PLANE0, plane);
+	glPopMatrix();
+}
+
+void disable_vertical_clipping_plane()
+{
+	glDisable(GL_CLIP_PLANE0);
+}
+
+void draw_polygon(polygon_t *polygon)
+{
+	dedge_t *edge;
+	dvertex_t *v;
+	float vertex_color; 
+	int i;
+	int lindex;
+	float s, t;
+	float max_z = models[0].maxs[2];
+	float min_z = models[0].mins[2];
+//	texture_t *texture = &textures[face->texinfo];
+	float *normal = polygon->plane->normal;
+	
+	// Set the normal of the face.
+	glNormal3fv(normal);
+	
+	// Draw the face.
+	glBegin(GL_POLYGON);
+	{
+		//if (strstr(texture->name, "sky"))
+		//	break;
+
+		//glEnable(GL_TEXTURE_2D);
+		//glBindTexture(GL_TEXTURE_2D, texture->texnum);
+
+		for (i = 0; i < polygon->vertex_count; i++)
+		{
+			v = polygon->vertices[i];
+
+			vertex_color = fabs(v->point[2] / (max_z - min_z));
+			glColor4f(vertex_color, vertex_color, vertex_color, 0.5);
+			glVertex3fv(v->point);
+		}
+	}
+	glEnd();
+	
+	glColor3f(1.0, 1.0, 1.0);
+	glBegin(GL_LINES);
+	{
+		dvertex_t *v0;
+		dvertex_t *v1;
+		for (i = 0; i < polygon->vertex_count - 1; i++)
+		{
+			v0 = polygon->vertices[i];
+			v1 = polygon->vertices[i+1];
+
+			if (!is_edge_long_enough(v0, v1))
+				continue;
+
+			glVertex3fv(v0->point);
+			glVertex3fv(v1->point);
+		}
+	}
+	glEnd();
 }
 
 void draw_axis()

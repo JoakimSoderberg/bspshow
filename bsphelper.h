@@ -20,16 +20,19 @@ typedef struct texture_s
 
 typedef struct polygon_s
 {
-	texture_t	*texture;
-	dvertex_t	*vertices;
-	float		*normal;
+	dvertex_t	**vertices;
+	dedge_t		**edges;
+	size_t		vertex_count;
+	size_t		edge_count;
 
 	dface_t		*face;
-	dedge_t		*edges;
 	dplane_t	*plane;
+	texture_t	*texture;
 } polygon_t;
 
+polygon_t *build_polygon_list(size_t *count);
 float calculate_face_area(dface_t *face);
+int is_edge_long_enough(dvertex_t *v0, dvertex_t *v1);
 int read_textures();
 void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data, int mip_level);
 

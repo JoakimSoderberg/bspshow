@@ -55,38 +55,55 @@ float calculate_face_area(dface_t *face)
 	return 0.0;
 }
 
+int is_edge_long_enough(dvertex_t *v0, dvertex_t *v1)
+{
+	float d[3];
+	float edge_length;
+	VectorSubtract(v0->point, v1->point, d);
 
-polygon_t *get_polygons(size_t *count)
+	edge_length = sqrt(d[0]*d[0] + d[1]*d[1] + d[2]*d[2]);
+
+	return (edge_length >= config.min_edge_length);
+}
+
+polygon_t *build_polygon_list(size_t *count)
 {
 	size_t i;
 	size_t e;
 	int lindex;
 	dface_t *face;
-	dvertex_t *vertices;
 	dedge_t *edge;
 	dvertex_t *v;
+	polygon_t *p;
 
 	// TODO: Make sure everything we need is already loaded.
 	polygon_t *polygons = (polygon_t *)calloc(face_count, sizeof(polygon_t));
+	
+	if (!polygons)
+		return NULL;
+
+	*count = face_count;
 
 	for (i = 0; i < face_count; i++)
 	{
+		p = &polygons[i];
+
 		// Save the face.
 		face = &faces[i];
-		polygons[i].face = face;
+		p->face = face;
 
 		// Save the plane the face is in.
-		polygons[i].plane = &planes[face->planenum];
+		p->plane = &planes[face->planenum];
 
 		// Allocate memory for the edges and vertices.
-		polygons[i].edges = (dedge_t **)calloc(face->numedges, sizeof(dedge_t *));
-		polygons[i].vertices = (dvertex_t **)calloc(face->numedges, sizeof(dvertex_t));
+		p->edges = (dedge_t **)calloc(face->numedges, sizeof(dedge_t *));
+		p->vertices = (dvertex_t **)calloc(face->numedges, sizeof(dvertex_t));
 
 		// Get the edges of the face.
 		for (e = 0; e < face->numedges; e++)
 		{
 			// The index in the ledge list can also be negative,
-			// the sign is just an indication what way we should walk
+			// the sign is just an indication which way we should walk
 			// around the edge of the face. We should always use the absolute
 			// value as the actual index.
 			lindex = ledges[face->firstedge + e];
@@ -103,20 +120,24 @@ polygon_t *get_polygons(size_t *count)
 			}
 
 			// Add the vertex to the list of face vertices.
-			polygons[i].vertices[e] = v;
+			p->vertices[e] = v;
+			p->vertex_count++;
 
 			// Save the edge.
-			polygons[i].edges[e] = edge;
+			p->edges[e] = edge;
+			p->edge_count++;
 		}
 	}
+
+	return polygons;
 }
 
 unsigned char *convert_8bit_to_24bit(const miptex_t *mip, const byte *texture, int mip_level)
 {
 	size_t i;
 	size_t color_index;
-	size_t width = mip->width / (int)pow(2.0, mip_level);
-	size_t height = mip->height / (int)pow(2.0, mip_level);
+	size_t width = mip->width / (1 << mip_level);
+	size_t height = mip->height / (1 << mip_level);
 	size_t original_size = width * height;
 	size_t expanded_size = (original_size * 3);
 	byte *expanded_data = (byte *)malloc(expanded_size);
@@ -134,18 +155,12 @@ unsigned char *convert_8bit_to_24bit(const miptex_t *mip, const byte *texture, i
 void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data, int mip_level)
 {
 	size_t i;
-	size_t width = mip->width / (int)pow(2.0, mip_level);
-	size_t height = mip->height / (int)pow(2.0, mip_level);
-	size_t original_size = width * height;
-	size_t expanded_size = (original_size * 3);
+	size_t width = mip->width / (1 << mip_level);
+	size_t height = mip->height / (1 << mip_level);
 	
 	byte *expanded_data = convert_8bit_to_24bit(mip, texture_data, mip_level);
-	t->width = width;
-	t->height = height;
 
 	glBindTexture(GL_TEXTURE_2D, t->texnum);
-
-	//glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);

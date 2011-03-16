@@ -33,6 +33,9 @@ int init_config()
 	return 1;
 }
 
+polygon_t *polygons;
+size_t polygon_count;
+
 dface_t *faces;
 size_t face_count = 0;
 
@@ -77,13 +80,21 @@ void renderScene(void)
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	glLoadIdentity();
 
-	for (j = 0; j < model_count; j++)
+	// Enable a clipping plane, so that a percentage of the absolute top of the level isn't drawn.
+	enable_vertical_clipping_plane();
+
+	for (i = 0; i < polygon_count; i++)
 	{
-		for (i = models[j].firstface; i < (size_t)models[j].numfaces; i++)
-		{
-			draw_face(&faces[i]);
-		}
+		float *normal = polygons[i].plane->normal;
+
+		// Don't draw walls in orthogonal projection.
+		if (!config.perspective && (normal[2] > -0.5) && (normal[2] < 0.5))
+			continue;
+
+		draw_polygon(&polygons[i]);
 	}
+
+	disable_vertical_clipping_plane();
 
 	glColor3f(1.0, 0.0, 0.0);
 	draw_text(300.0, 300.0, 0.0, "(%2.1f, %2.1f) zoom %2.2f", config.x, config.y, config.zoom);
@@ -112,6 +123,8 @@ int read_bsp_data(const char *filename)
 	planes = get_planes(&plane_count);
 
 	read_textures();
+
+	polygons = build_polygon_list(&polygon_count);
 
 	return 1;
 }
