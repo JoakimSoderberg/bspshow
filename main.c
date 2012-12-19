@@ -1,7 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
+
+#ifdef WIN32
 #include <windows.h>
+#endif
+
+#ifdef WITH_FREEGLUT
 #include <gl/freeglut.h>
+#else
+#include <glut.h>
+#endif
 
 #include <math.h>
 #include <time.h>
@@ -122,7 +130,7 @@ int read_bsp_data(const char *filename)
 	models = get_models(&model_count);
 	planes = get_planes(&plane_count);
 
-	read_textures();
+	//read_textures();
 
 	polygons = build_polygon_list(&polygon_count);
 
@@ -141,6 +149,8 @@ void init_lighting()
 
 int main(int argc, char **argv)
 {
+	printf("BSPSHOW\n");
+
 	if (argc < 2)
 	{
 		printf("Not enough arguments\n");
@@ -151,6 +161,8 @@ int main(int argc, char **argv)
 
 	if (!read_bsp_data(argv[1]))
 		return -1;
+
+	printf("Read BSP\n");
 
 	glutInit(&argc, argv);
 	//glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);

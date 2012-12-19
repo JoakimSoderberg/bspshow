@@ -1,8 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
+#ifdef WIN32
 #include <windows.h>
+#endif
+#ifdef WITH_FREEGLUT
 #include <gl/freeglut.h>
+#else
+#include <glut.h>
+#endif
 #include "qpallete.h"
 #include "utils.h"
 #include "config.h"

@@ -1,5 +1,9 @@
 
+#ifdef WITH_FREEGLUT
 #include <gl/freeglut.h>
+#else
+#include <glut.h>
+#endif
 #include "input.h"
 #include "config.h"
 

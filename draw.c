@@ -1,6 +1,10 @@
 
 #include <math.h>
+#ifdef WITH_FREEGLUT
 #include <gl/freeglut.h>
+#else
+#include <glut.h>
+#endif
 #include <stdarg.h>
 #include "bsp.h"
 #include "draw.h"

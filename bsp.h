@@ -3,8 +3,9 @@
 #define __BSP_H__
 
 #include "bspfile.h"
-
-typedef unsigned char byte;
+#include <stdio.h>
+#include <stdlib.h>
+//typedef unsigned char byte;
 
 int open_bsp(const char *filename);
 dvertex_t *get_vertices(size_t *count);
