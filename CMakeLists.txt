@@ -17,13 +17,16 @@ set(BSPSHOW_SRCS
 
 set(BSPSHOW_LIBS)
 
+# Windows doesn't have GLUT by default, so we use freeglut.
 if (WIN32)
 	set(WITH_FREEGLUT 1)
-	include_directories("win32/freeglut/include")
-	link_directories("win32/freeglut/lib")
+	set(FREEGLUT_DIR ${PROJECT_SOURCE_DIR}/win32/freeglut)
+	include_directories("${FREEGLUT_DIR}/include")
+	link_directories("${FREEGLUT_DIR}/lib")
 	list(APPEND BSPSHOW_LIBS freeglut.lib)
 endif()
 
+# Use normal GLUT on Unix.
 if (NOT WITH_FREEGLUT)
 	find_package(GLUT REQUIRED)
 	find_package(OpenGL REQUIRED)
@@ -45,7 +48,7 @@ target_link_libraries(bspshow ${BSPSHOW_LIBS})
 
 if (WITH_FREEGLUT)
 	# Copy the freeglut.dll to the output dir.
-	add_custom_command(TARGET ${AGENT_NAME} 
+	add_custom_command(TARGET bspshow
 			POST_BUILD 
-			COMMAND ${CMAKE_COMMAND} -E copy freeglut.dll $<TARGET_FILE_DIR:bspshow> VERBATIM)
+			COMMAND ${CMAKE_COMMAND} -E copy ${FREEGLUT_DIR}/freeglut.dll $<TARGET_FILE_DIR:bspshow> VERBATIM)
 endif()
