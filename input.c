@@ -1,4 +1,4 @@
-
+#include "bspshow_config.h"
 #ifdef WITH_FREEGLUT
 #include <gl/freeglut.h>
 #else

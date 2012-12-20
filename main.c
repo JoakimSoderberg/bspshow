@@ -1,3 +1,4 @@
+#include "bspshow_config.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -149,7 +150,7 @@ void init_lighting()
 
 int main(int argc, char **argv)
 {
-	printf("BSPSHOW\n");
+	printf("BSP Show v%s\n", BSPSHOW_VERSION);
 
 	if (argc < 2)
 	{
