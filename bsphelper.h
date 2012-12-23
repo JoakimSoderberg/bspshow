@@ -30,7 +30,16 @@ typedef struct polygon_s
 	texture_t	*texture;
 } polygon_t;
 
-polygon_t *build_polygon_list(size_t *count);
+typedef struct bsp_helper_s
+{
+	bsp_t *bsp;
+	
+	polygon_t *polygons;
+	size_t polygon_count;
+
+} bsp_helper_t;
+
+polygon_t *bsp_build_polygon_list(bsp_t *bsp, size_t *count);
 float calculate_face_area(dface_t *face);
 int is_edge_long_enough(dvertex_t *v0, dvertex_t *v1);
 int read_textures();

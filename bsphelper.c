@@ -74,7 +74,7 @@ int is_edge_long_enough(dvertex_t *v0, dvertex_t *v1)
 	return (edge_length >= config.min_edge_length);
 }
 
-polygon_t *build_polygon_list(size_t *count)
+polygon_t *bsp_build_polygon_list(bsp_t *bsp, size_t *count)
 {
 	size_t i;
 	size_t e;
@@ -83,25 +83,28 @@ polygon_t *build_polygon_list(size_t *count)
 	dedge_t *edge;
 	dvertex_t *v;
 	polygon_t *p;
+	polygon_t *polygons;
 
-	// TODO: Make sure everything we need is already loaded.
-	polygon_t *polygons = (polygon_t *)calloc(face_count, sizeof(polygon_t));
+	assert(bsp);
+	assert(count);
+
+	polygons = (polygon_t *)calloc(bsp->face_count, sizeof(polygon_t));
 	
 	if (!polygons)
 		return NULL;
 
-	*count = face_count;
+	*count = bsp->face_count;
 
-	for (i = 0; i < face_count; i++)
+	for (i = 0; i < bsp->face_count; i++)
 	{
 		p = &polygons[i];
 
 		// Save the face.
-		face = &faces[i];
+		face = &bsp->faces[i];
 		p->face = face;
 
 		// Save the plane the face is in.
-		p->plane = &planes[face->planenum];
+		p->plane = &bsp->planes[face->planenum];
 
 		// Allocate memory for the edges and vertices.
 		p->edges = (dedge_t **)calloc(face->numedges, sizeof(dedge_t *));
@@ -114,17 +117,17 @@ polygon_t *build_polygon_list(size_t *count)
 			// the sign is just an indication which way we should walk
 			// around the edge of the face. We should always use the absolute
 			// value as the actual index.
-			lindex = ledges[face->firstedge + e];
+			lindex = bsp->ledges[face->firstedge + e];
 
 			if (lindex > 0)
 			{					
-				edge = &edges[lindex];
-				v = &vertices[edge->v[0]];
+				edge = &bsp->edges[lindex];
+				v = &bsp->vertices[edge->v[0]];
 			}
 			else
 			{
-				edge = &edges[-lindex];
-				v = &vertices[edge->v[1]];
+				edge = &bsp->edges[-lindex];
+				v = &bsp->vertices[edge->v[1]];
 			}
 
 			// Add the vertex to the list of face vertices.
@@ -181,6 +184,7 @@ void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data,
 	free(expanded_data);
 }
 
+#if 0
 int read_textures()
 {
 	size_t i;
@@ -240,3 +244,5 @@ int read_textures()
 
 	return 1;
 }
+#endif
+

@@ -30,6 +30,9 @@ typedef vec_t vec3_t[3];
 typedef vec_t vec5_t[5];
 
 config_t config;
+bsp_t bsp;
+polygon_t *polygons;
+size_t polygon_count;
 
 int init_config()
 {
@@ -41,38 +44,6 @@ int init_config()
 
 	return 1;
 }
-
-polygon_t *polygons;
-size_t polygon_count;
-
-dface_t *faces;
-size_t face_count = 0;
-
-dedge_t *edges;
-size_t edge_count = 0;
-
-int *ledges;
-size_t ledge_count = 0;
-
-dvertex_t *vertices;
-size_t vertex_count = 0;
-
-dmodel_t *models;
-size_t model_count = 0;
-
-dplane_t *planes;
-size_t plane_count = 0;
-
-texture_t *textures;
-size_t texture_count = 0;
-
-// Texture related.
-dmiptexlump_t *mip_header;
-miptex_t **mipmap_ptrs;
-size_t mipmap_count = 0;
-
-texinfo_t *textureinfos;
-size_t texinfo_count = 0;
 
 void renderScene(void)
 {	
@@ -90,7 +61,7 @@ void renderScene(void)
 	glLoadIdentity();
 
 	// Enable a clipping plane, so that a percentage of the absolute top of the level isn't drawn.
-	enable_vertical_clipping_plane();
+	enable_vertical_clipping_plane(&bsp);
 
 	for (i = 0; i < polygon_count; i++)
 	{
@@ -100,7 +71,7 @@ void renderScene(void)
 		if (!config.perspective && (normal[2] > -0.5) && (normal[2] < 0.5))
 			continue;
 
-		draw_polygon(&polygons[i]);
+		draw_polygon(&bsp, &polygons[i]);
 	}
 
 	disable_vertical_clipping_plane();
@@ -110,32 +81,10 @@ void renderScene(void)
 
 	draw_axis();
 
-	draw_bounding_box(&models[0]);
+	draw_bounding_box(&bsp.models[0]);
 
 	glPopMatrix();
 	glutSwapBuffers();
-}
-
-int read_bsp_data(const char *filename)
-{
-	if (!open_bsp(filename))
-	{
-		printf("Failed to open bsp: %s.\n", filename);
-		return 0;
-	}
-
-	faces = get_faces(&face_count);
-	edges = get_edges(&edge_count);
-	ledges = get_ledges(&ledge_count);
-	vertices = get_vertices(&vertex_count);
-	models = get_models(&model_count);
-	planes = get_planes(&plane_count);
-
-	//read_textures();
-
-	polygons = build_polygon_list(&polygon_count);
-
-	return 1;
 }
 
 void init_lighting()
@@ -154,21 +103,25 @@ int main(int argc, char **argv)
 
 	if (argc < 2)
 	{
-		printf("Not enough arguments\n");
+		fprintf(stderr, "Usage: %s filename.bsp\n", argv[0]);
+		fprintf(stderr, "Not enough arguments!\n");
 		return -1;
 	}
 
 	init_config();
-
-	if (!read_bsp_data(argv[1]))
+	
+	if (bsp_read_file(argv[1], &bsp))
+	{
+		fprintf(stderr, "Failed to read BSP\n");
 		return -1;
+	}
 
-	printf("Read BSP\n");
+	polygons = bsp_build_polygon_list(&bsp, &polygon_count);
 
 	glutInit(&argc, argv);
 	//glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
 	glutInitWindowSize(config.window_width, config.window_height);
-	glutCreateWindow("SnowMen");
+	glutCreateWindow("BSP Show");
 	glutDisplayFunc(renderScene);
 	glutIdleFunc(renderScene);
 	//glutMouseFunc(on_mouse);
@@ -199,8 +152,8 @@ int main(int argc, char **argv)
 	//init_lighting();
 
 	{
-		float *maxs = models[0].maxs;
-		float *mins = models[0].mins;
+		float *maxs = bsp.models[0].maxs;
+		float *mins = bsp.models[0].mins;
 		float qsize_x = maxs[0] - mins[0];
 		float qsize_y = maxs[1] - mins[1];
 
@@ -208,8 +161,8 @@ int main(int argc, char **argv)
 		printf("x %2.2f     %2.2f\n", maxs[0], mins[0]);
 		printf("y %2.2f     %2.2f\n", maxs[1], mins[1]);
 		printf("z %2.2f     %2.2f\n", maxs[2], mins[2]);
-		config.x = models[0].maxs[0];
-		config.y = -models[0].mins[1];
+		config.x = bsp.models[0].maxs[0];
+		config.y = -bsp.models[0].mins[1];
 
 		if (qsize_x < qsize_y)
 		{
@@ -227,10 +180,7 @@ int main(int argc, char **argv)
 	glutMainLoop();
 	
 	// Cleanup.
-	free(vertices);
-	free(edges);
-	free(ledges);
-	free(models);
+	bsp_destroy(bsp);
 
 	return 0;
 }

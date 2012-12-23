@@ -150,6 +150,7 @@ void draw_bounding_box(dmodel_t *m)
 	glPopAttrib();
 }
 
+#if 0
 void draw_face(dface_t *face)
 {
 	dedge_t *edge;
@@ -246,14 +247,14 @@ end:
 	}
 	glEnd();
 	
-
 	glDisable(GL_CLIP_PLANE0);
 }
+#endif
 
-void enable_vertical_clipping_plane()
+void enable_vertical_clipping_plane(bsp_t *bsp)
 {
-	float max_z = models[0].maxs[2];
-	float min_z = models[0].mins[2];
+	float max_z = bsp->models[0].maxs[2];
+	float min_z = bsp->models[0].mins[2];
 	double plane[4] = {0.0, 0.0, -1.0, 0.0};
 	glPushMatrix();
 	glEnable(GL_CLIP_PLANE0);
@@ -267,7 +268,7 @@ void disable_vertical_clipping_plane()
 	glDisable(GL_CLIP_PLANE0);
 }
 
-void draw_polygon(polygon_t *polygon)
+void draw_polygon(bsp_t *bsp, polygon_t *polygon)
 {
 	dedge_t *edge;
 	dvertex_t *v;
@@ -275,8 +276,8 @@ void draw_polygon(polygon_t *polygon)
 	int i;
 	int lindex;
 	float s, t;
-	float max_z = models[0].maxs[2];
-	float min_z = models[0].mins[2];
+	float max_z = bsp->models[0].maxs[2];
+	float min_z = bsp->models[0].mins[2];
 //	texture_t *texture = &textures[face->texinfo];
 	float *normal = polygon->plane->normal;
 	
@@ -361,11 +362,54 @@ void draw_axis()
     //glDepthFunc(GL_LEQUAL);
 }
 
+/*
+void setup_perspectve_projection_matrix(float *m, float fov, float aspect, float znear, float zfar)
+{
+	float ymax = znear * tan(fov * PI / 360.0);
+	float ymin = -ymax;
+	float xmax = ymax * aspect;
+	float xmin = ymin * aspect;
+
+	//float width = xymax - xmin;
+	//float height = xymax - ymin;
+	float width = xmax - xmin;
+	float height = ymax - ymin;
+
+	float depth = zfar - znear;
+	float q = -(zfar + znear) / depth;
+	float qn = -2 * (zfar * znear) / depth;
+
+	float w = 2 * znear / width;
+	//w = w / aspect;
+	float h = 2 * znear / height;
+
+	m[0]  = w;
+	m[1]  = 0;
+	m[2]  = 0;
+	m[3]  = 0;
+
+	m[4]  = 0;
+	m[5]  = h;
+	m[6]  = 0;
+	m[7]  = 0;
+
+	m[8]  = 0;
+	m[9]  = 0;
+	m[10] = q;
+	m[11] = -1;
+
+	m[12] = 0;
+	m[13] = 0;
+	m[14] = qn;
+	m[15] = 0;
+}
+*/
+
 void place_camera()
 {
 	glMatrixMode(GL_PROJECTION);
 	glLoadIdentity();
-	
+
 	if (config.perspective)
 	{
 		float x = config.x;
@@ -375,6 +419,13 @@ void place_camera()
 		float cy = config.cy;
 		float cz = config.cz;
 		gluPerspective(70.0, 1.0, 1.0, 5000.0);
+		//setup_perspectve_projection_matrix();
+		/*glFrustum(-1.0, // left
+					1.0, // right
+					 -1.0, // bottom
+					  1.0, // top
+					  -100, // near
+					  1000); // far*/
 		gluLookAt(x, y, z, cx, cy, cz, 0, 0.0, 1.0);
 	}
 	else
