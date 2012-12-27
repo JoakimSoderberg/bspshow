@@ -13,6 +13,7 @@ set(BSPSHOW_SRCS
 	input.c
 	main.c
 	utils.c
+	md4.c
 	)
 
 set(BSPSHOW_LIBS)

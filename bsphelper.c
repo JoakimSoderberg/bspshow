@@ -145,32 +145,45 @@ polygon_t *bsp_build_polygon_list(bsp_t *bsp, size_t *count)
 
 unsigned char *convert_8bit_to_24bit(const miptex_t *mip, const byte *texture, int mip_level)
 {
-	size_t i;
-	size_t color_index;
-	size_t width = mip->width / (1 << mip_level);
-	size_t height = mip->height / (1 << mip_level);
-	size_t original_size = width * height;
-	size_t expanded_size = (original_size * 3);
-	byte *expanded_data = (byte *)malloc(expanded_size);
-
-	// Convert the image from indexed palette values to RGB values for each pixel.
-	for (i = 0; i < original_size; i++)
+	assert(mip);
+	assert(texture);
 	{
-		color_index = texture[i];
-		memcpy(&expanded_data[i*3], &quake_pallete[color_index], 3);
-	}
+		size_t i;
+		size_t j;
+		size_t color_index;
+		size_t width = mip->width / (1 << mip_level);
+		size_t height = mip->height / (1 << mip_level);
+		size_t original_size = width * height;
+		size_t expanded_size = (original_size * 3);
+		byte *expanded_data = (byte *)malloc(expanded_size);
 
-	return expanded_data;
+		if (!expanded_data)
+		{
+			fprintf(stderr, "Out of memory!\n");
+			return NULL;
+		}
+
+		// Convert the image from indexed palette values 
+		// to RGB values for each pixel.
+		for (i = 0, j = 0; i < original_size; i++, j+=3)
+		{
+			color_index = texture[i];
+			
+			expanded_data[j] = quake_pallete[color_index][0];
+			expanded_data[j+1] = quake_pallete[color_index][1];
+			expanded_data[j+2] = quake_pallete[color_index][2];
+		}
+
+		return expanded_data;
+	}
 }
 
-void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data, int mip_level)
+void bsp_upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data, int mip_level)
 {
 	size_t i;
 	size_t width = mip->width / (1 << mip_level);
 	size_t height = mip->height / (1 << mip_level);
 	
-	byte *expanded_data = convert_8bit_to_24bit(mip, texture_data, mip_level);
-
 	glBindTexture(GL_TEXTURE_2D, t->texnum);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
@@ -179,9 +192,40 @@ void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data,
 	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 
 	// Upload the image to OpenGL.
-	glTexImage2D(GL_TEXTURE_2D, mip_level, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, expanded_data);
+	glTexImage2D(GL_TEXTURE_2D, mip_level, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, texture_data);
+}
 
-	free(expanded_data);
+byte *bsp_get_texture(const bsp_t *bsp, unsigned int texnum, int mip_level)
+{
+	assert(bsp);
+	assert(bsp->mip_data);
+	//assert(miptex);
+	{
+		size_t i;
+		miptex_t *miptex = bsp->mip_list[texnum];
+		byte *texture_data;
+		dmiptexlump_t *miptex_header = (dmiptexlump_t *)bsp->mip_data;
+
+		// The miptex offsets are relative to the start of the texture lump.
+		size_t offset = miptex_header->dataofs[texnum] + miptex->offsets[mip_level];
+		
+		// There are several mip levels stored. 1, 1/2, 1/4, 1/8 of the original size.
+		size_t width = miptex->width / (int) pow(2.0, mip_level); 
+		size_t height = miptex->height / (int) pow(2.0, mip_level);
+		size_t size = width * height;
+
+		// Instead of RGB values, the texture contains indexes, which is used to get
+		// the RGB values from the 256 color pallete.
+		if (!(texture_data = (byte *)calloc(size, sizeof(byte))))
+		{
+			fprintf(stderr, "Out of memory!\n");
+			return NULL;
+		}
+
+		memcpy(texture_data, &bsp->mip_data[offset], size);
+
+		return texture_data;
+	}
 }
 
 #if 0
@@ -245,4 +289,81 @@ int read_textures()
 	return 1;
 }
 #endif
+
+int bsp_upload_textures(bsp_helper_t *bsph)
+{
+	assert(bsph);
+	assert(bsph->bsp);
+	{
+		size_t i;
+		texinfo_t *texinf;
+		size_t texnum;
+		size_t mip_level;
+		texture_t *t;
+		miptex_t *mip;
+		byte *texture_data;
+		byte *expanded_data;
+		bsp_t *bsp = bsph->bsp;
+		assert(bsp->mip_data);
+		assert(bsp->mip_list);
+		assert(bsp->faces);
+
+		if (bsph->textures)
+		{
+			free(bsph->textures);
+			bsph->textures = NULL;
+		}
+
+		// Allocate space for the texture list.
+		if (!(bsph->textures = (texture_t *)calloc(bsp->texinfo_count, sizeof(texture_t))))
+		{
+			fprintf(stderr, "Out of memory!\n");
+			return -1;
+		}
+
+		// Several faces can share a texinfo.
+		// Go through each face, and get its texinfo. Only create a new texture_t
+		// if the texture hasn't already been loaded.
+		for (i = 0; i < bsp->face_count; i++)
+		{
+			texinf = &bsp->texinfos[bsp->faces[i].texinfo];
+			texnum = texinf->miptex;
+
+			// Skip this, already loaded.
+			if ((texnum == 0) || bsph->textures[texnum].is_loaded)
+				continue;
+
+			// Add a new texture.
+			//texinf = &bsp->texinfos[texnum];
+
+			t = &bsph->textures[texnum];
+			t->texnum = texnum;
+
+			vector_copy(t->s, texinf->vectorS);
+			vector_copy(t->t, texinf->vectorT);
+			t->distS = texinf->distS;
+			t->distT = texinf->distT;
+
+			// Get the pointer to the mipmap.
+			mip = bsp->mip_list[texinf->miptex];
+			strcpy(t->name, mip->name);
+			t->width = mip->width;
+			t->height = mip->height;
+
+			// Upload the texture data to OpenGL.
+			for (mip_level = 0; mip_level < MIPLEVELS; mip_level++)
+			{
+				texture_data = bsp_get_texture(bsp, texnum, mip_level);
+				expanded_data = convert_8bit_to_24bit(mip, texture_data, mip_level);
+				bsp_upload_texture(t, mip, expanded_data, mip_level);
+				free(texture_data);
+				free(expanded_data);
+			}
+
+			t->is_loaded = 1;
+			bsph->texture_count++;
+		}
+	}
+}
+
 

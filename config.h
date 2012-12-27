@@ -23,6 +23,9 @@ typedef struct config_s
 
 	int perspective;
 	float zoom;
+
+	const char *filename;
+	int list_textures;
 } config_t;
 
 extern config_t config;

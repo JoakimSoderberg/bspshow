@@ -279,6 +279,7 @@ void draw_polygon(bsp_t *bsp, polygon_t *polygon)
 	float max_z = bsp->models[0].maxs[2];
 	float min_z = bsp->models[0].mins[2];
 //	texture_t *texture = &textures[face->texinfo];
+	//texture_t *texture = bsp->textures[face->texinfo];
 	float *normal = polygon->plane->normal;
 	
 	// Set the normal of the face.

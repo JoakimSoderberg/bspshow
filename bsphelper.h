@@ -37,6 +37,8 @@ typedef struct bsp_helper_s
 	polygon_t *polygons;
 	size_t polygon_count;
 
+	texture_t *textures;
+	size_t texture_count;
 } bsp_helper_t;
 
 polygon_t *bsp_build_polygon_list(bsp_t *bsp, size_t *count);
@@ -44,5 +46,8 @@ float calculate_face_area(dface_t *face);
 int is_edge_long_enough(dvertex_t *v0, dvertex_t *v1);
 int read_textures();
 void upload_texture(texture_t *t, const miptex_t *mip, const byte *texture_data, int mip_level);
+
+byte *bsp_get_texture(const bsp_t *bsp, unsigned int texnum, int mip_level);
+unsigned char *convert_8bit_to_24bit(const miptex_t *mip, const byte *texture, int mip_level);
 
 #endif // __BSPHELPER_H__

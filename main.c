@@ -1,6 +1,7 @@
 #include "bspshow_config.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifdef WIN32
 #include <windows.h>
@@ -30,6 +31,7 @@ typedef vec_t vec3_t[3];
 typedef vec_t vec5_t[5];
 
 config_t config;
+bsp_helper_t bsph;
 bsp_t bsp;
 polygon_t *polygons;
 size_t polygon_count;
@@ -97,9 +99,52 @@ void init_lighting()
     glEnable (GL_LIGHT0);
 }
 
-int main(int argc, char **argv)
+static void write_targa(const char *filename, const GLubyte *buffer, int width, int height)
 {
-	printf("BSP Show v%s\n", BSPSHOW_VERSION);
+	FILE *f = fopen( filename, "w" );
+
+	if (f) 
+	{
+		int i, x, y;
+		const GLubyte *ptr = buffer;
+		fputc (0x00, f);	/* ID Length, 0 => No ID	*/
+		fputc (0x00, f);	/* Color Map Type, 0 => No color map included	*/
+		fputc (0x02, f);	/* Image Type, 2 => Uncompressed, True-color Image */
+		fputc (0x00, f);	/* Next five bytes are about the color map entries */
+		fputc (0x00, f);	/* 2 bytes Index, 2 bytes length, 1 byte size */
+		fputc (0x00, f);
+		fputc (0x00, f);
+		fputc (0x00, f);
+		fputc (0x00, f);	/* X-origin of Image	*/
+		fputc (0x00, f);
+		fputc (0x00, f);	/* Y-origin of Image	*/
+		fputc (0x00, f);
+		fputc (width & 0xff, f);      /* Image Width	*/
+		fputc ((width>>8) & 0xff, f);
+		fputc (height & 0xff, f);     /* Image Height	*/
+		fputc ((height>>8) & 0xff, f);
+		fputc (0x18, f);		/* Pixel Depth, 0x18 => 24 Bits	*/
+		fputc (0x20, f);		/* Image Descriptor	*/
+		fclose(f);
+		f = fopen( filename, "ab" );  /* reopen in binary append mode */
+		for (y=height-1; y>=0; y--) 
+		{
+			for (x=0; x<width; x++) 
+			{
+				i = (y*width + x) * 3;
+				fputc(ptr[i+2], f); /* write blue */
+				fputc(ptr[i+1], f); /* write green */
+				fputc(ptr[i], f);   /* write red */
+			}
+      }
+      fclose(f);
+	}
+}
+
+
+int parse_cmdline(int argc, char **argv)
+{
+	size_t i;
 
 	if (argc < 2)
 	{
@@ -108,12 +153,94 @@ int main(int argc, char **argv)
 		return -1;
 	}
 
+	config.filename = NULL;
+
+	for (i = 1; i < argc; i++)
+	{
+		char *s = argv[i];
+		size_t slen = strlen(s);
+
+		if (slen == 0)
+			continue;
+
+		if (s[0] == '-')
+		{
+			if (slen <= 1)
+				continue;
+
+			switch (s[1])
+			{
+				case 't':
+					config.list_textures = 1;
+					break;
+				default:
+					fprintf(stderr, "Unknown switch '%c'\n", s[1]);
+					break;
+			}
+		}
+		else
+		{
+			config.filename = s;
+		}
+	}
+
+	if (!config.filename)
+	{
+		return -1;
+	}
+
+	return 0;
+}
+
+int main(int argc, char **argv)
+{
+	printf("BSP Show v%s\n", BSPSHOW_VERSION);
+
 	init_config();
+
+	if (parse_cmdline(argc, argv))
+	{
+		return -1;
+	}
 	
-	if (bsp_read_file(argv[1], &bsp))
+	if (bsp_read_file(config.filename, &bsp))
 	{
 		fprintf(stderr, "Failed to read BSP\n");
 		return -1;
+	}
+
+	printf("%s\n", bsp.entity_data);
+
+	// List all textures.
+	if (config.list_textures)
+	{
+		size_t i;
+		texinfo_t *t;
+		miptex_t *mip;
+
+		for (i = 0; i < bsp.mipmap_count; i++)
+		{
+			mip = bsp.mip_list[i];
+
+			printf("Texture %-2zu %15s (%-2dx%-2d)\n", i, mip->name, mip->width, mip->height);
+
+			#if 0
+			// Write the texture to file.
+			if (i == 6)
+			{
+				char mipname[1024];
+				byte *data = bsp_get_texture(&bsp, i, 0);
+				byte *expanded_data = convert_8bit_to_24bit(mip, data, 0);
+
+				strlcpy(mipname, mip->name, sizeof(mipname));
+				strlcat(mipname, ".tga", sizeof(mipname));
+
+				write_targa(mipname, (GLubyte *)expanded_data, mip->width, mip->height);
+				free(data);
+			}
+			#endif
+		}
+		return;
 	}
 
 	polygons = bsp_build_polygon_list(&bsp, &polygon_count);
